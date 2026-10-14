@@ -1,0 +1,78 @@
+{
+  "name": "todomvc-playwright-framework",
+  "version": "1.0.0",
+  "description": "End-to-end test automation framework for the TodoMVC demo app using Playwright, BDD, Allure and Docker",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "pretest": "bddgen",
+    "test": "playwright test --project=chromium --project=firefox --project=webkit --project=mobile-chrome --project=mobile-safari --project=a11y --project=bdd",
+    "test:all": "bddgen && playwright test",
+    "test:staging": "cross-env TEST_ENV=staging npm test",
+    "test:e2e": "playwright test --project=chromium --project=firefox --project=webkit",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:mobile": "playwright test --project=mobile-chrome --project=mobile-safari",
+    "test:smoke": "playwright test --project=chromium --grep @smoke",
+    "test:regression": "playwright test --grep @regression",
+    "test:a11y": "playwright test --project=a11y",
+    "test:visual": "playwright test --project=visual",
+    "test:visual:update": "playwright test --project=visual --update-snapshots",
+    "test:bdd": "bddgen && playwright test --project=bdd",
+    "test:headed": "playwright test --project=chromium --headed",
+    "test:debug": "playwright test --project=chromium --debug",
+    "test:ui": "bddgen && playwright test --ui",
+    "report:html": "playwright show-report reports/html-report",
+    "report:allure": "allure generate allure-results -o reports/allure-report && allure open reports/allure-report",
+    "report:allure:generate": "allure generate allure-results -o reports/allure-report",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rm -rf test-results reports allure-results allure-report .features-gen",
+    "docker:build": "docker compose build",
+    "docker:test": "docker compose run --rm tests",
+    "docker:visual:update": "docker compose run --rm tests npx playwright test --project=visual --update-snapshots",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,feature}": [
+      "prettier --write --ignore-unknown"
+    ]
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "test-automation",
+    "bdd",
+    "allure",
+    "docker"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
+    "@faker-js/faker": "^10.6.0",
+    "@playwright/test": "1.64.0",
+    "allure": "^3.20.1",
+    "allure-playwright": "^3.13.0",
+    "cross-env": "^10.1.0",
+    "dotenv": "^18.0.7",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-playwright": "^2.12.1",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "playwright-bdd": "^9.2.1",
+    "prettier": "^3.9.10"
+  }
+}

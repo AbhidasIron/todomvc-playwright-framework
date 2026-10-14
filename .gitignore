@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Test outputs (regenerated on every run)
+test-results/
+reports/
+allure-results/
+allure-report/
+playwright-report/
+blob-report/
+.features-gen/
+
+# Local env / secrets
+.env
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

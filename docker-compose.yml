@@ -1,0 +1,30 @@
+services:
+  tests:
+    build: .
+    image: todomvc-playwright-tests
+    # Chromium needs more than Docker's default 64MB shared memory.
+    ipc: host
+    init: true
+    environment:
+      - CI=true
+      - TEST_ENV=${TEST_ENV:-qa}
+      - BASE_URL=${BASE_URL:-}
+    volumes:
+      # Reports and baselines are written back to the host.
+      - ./reports:/app/reports
+      - ./allure-results:/app/allure-results
+      - ./test-results:/app/test-results
+      - ./tests/visual/__screenshots__:/app/tests/visual/__screenshots__
+    command: ['npm', 'test']
+
+  # Serves the generated HTML report at http://localhost:9323
+  report:
+    image: mcr.microsoft.com/playwright:v1.64.0-noble
+    working_dir: /app
+    volumes:
+      - ./reports:/app/reports
+    ports:
+      - '9323:9323'
+    command:
+      ['npx', '-y', 'playwright@1.64.0', 'show-report', 'reports/html-report', '--host', '0.0.0.0']
+    profiles: ['report']

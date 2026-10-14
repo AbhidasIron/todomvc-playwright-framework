@@ -1,0 +1,162 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *' # nightly regression at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      test_env:
+        description: Target environment
+        type: choice
+        options: [qa, staging, prod]
+        default: qa
+      update_visual_baselines:
+        description: Regenerate Linux visual baselines and upload them as an artifact
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TEST_ENV: ${{ inputs.test_env || 'qa' }}
+
+jobs:
+  lint:
+    name: Lint & format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run format:check
+
+  test:
+    name: Test (${{ matrix.name }})
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --user 1001 --ipc=host
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: chromium
+            projects: --project=chromium
+          - name: firefox
+            projects: --project=firefox
+          - name: webkit
+            projects: --project=webkit
+          - name: mobile
+            projects: --project=mobile-chrome --project=mobile-safari
+          - name: a11y
+            projects: --project=a11y
+          - name: bdd
+            projects: --project=bdd
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --ignore-scripts
+      - run: npx bddgen
+      - name: Run tests
+        run: npx playwright test ${{ matrix.projects }}
+      - name: Upload reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.name }}
+          path: reports/
+          retention-days: 14
+      - name: Upload Allure results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.name }}
+          path: allure-results/
+          retention-days: 14
+      - name: Upload traces, videos & screenshots
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.name }}
+          path: test-results/
+          retention-days: 7
+
+  visual:
+    name: Visual regression
+    needs: lint
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --user 1001 --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --ignore-scripts
+      - name: Update Linux baselines
+        if: ${{ inputs.update_visual_baselines }}
+        run: npx playwright test --project=visual --update-snapshots
+      - name: Upload new baselines
+        if: ${{ inputs.update_visual_baselines }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-linux
+          path: tests/visual/__screenshots__/
+      - name: Compare against baselines
+        # Skips until Linux baselines are committed (generate them with Docker or the input above).
+        if: ${{ !inputs.update_visual_baselines && hashFiles('tests/visual/__screenshots__/visual/linux/**') != '' }}
+        run: npx playwright test --project=visual
+      - name: Upload visual diff report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: |
+            reports/
+            test-results/
+
+  allure-report:
+    name: Allure report
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Download all Allure results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-*
+          path: allure-results
+          merge-multiple: true
+      - run: npx allure generate allure-results -o allure-report
+      - uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+      # Publishing requires GitHub Pages to be enabled with "GitHub Actions" as the source.
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report/
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/deploy-pages@v4

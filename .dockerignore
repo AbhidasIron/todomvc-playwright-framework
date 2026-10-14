@@ -1,0 +1,11 @@
+node_modules
+test-results
+reports
+allure-results
+allure-report
+playwright-report
+.features-gen
+.git
+.husky
+.env
+.DS_Store
